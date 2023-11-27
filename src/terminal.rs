@@ -1,3 +1,5 @@
+//  terminal.rs
+//
 use std::io::{self, BufRead, Read, Write};
 
 use crate::{ansi_escape::DEVICE_STATUS_REPORT, ansi_escape::REPOSITION_CURSOR_END, sys, Error};
@@ -15,9 +17,11 @@ pub fn get_window_size_using_cursor() -> Result<(usize, usize), Error> {
     io::stdout().flush()?;
     let mut prefix_buffer = [0_u8; 2];
     stdin.read_exact(&mut prefix_buffer)?;
+
     if prefix_buffer != [b'\x1b', b'['] {
         return Err(Error::CursorPosition);
     }
+
     Ok((read_value_until(b';')?, read_value_until(b'R')?))
 }
 
@@ -25,6 +29,7 @@ pub fn get_window_size_using_cursor() -> Result<(usize, usize), Error> {
 fn read_value_until<T: std::str::FromStr>(stop_byte: u8) -> Result<T, Error> {
     let mut buf = Vec::new();
     io::stdin().lock().read_until(stop_byte, &mut buf)?;
+    
     // Check that we have reached `stop_byte`, not EOF.
     buf.pop().filter(|u| *u == stop_byte).ok_or(Error::CursorPosition)?;
     std::str::from_utf8(&buf).or(Err(Error::CursorPosition))?.parse().or(Err(Error::CursorPosition))

@@ -1,7 +1,13 @@
+//  syntax.rs
+//
 use std::fmt::{self, Display, Formatter};
 use std::path::{Path, PathBuf};
 
-use crate::config::{self, parse_value as pv, parse_values as pvs};
+use crate::config::{
+    self, 
+    parse_value as pv, 
+    parse_values as pvs
+};
 use crate::{sys, Error};
 
 /// Type of syntax highlighting for a single rendered character.
@@ -23,8 +29,11 @@ pub enum HlType {
 }
 
 impl Display for HlType {
-    /// Write the ANSI color escape sequence for the `HLType` using the given formatter.
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result { write!(f, "\x1b[{}m", (*self as u32) % 100) }
+    /// Write the ANSI color escape sequence for the `HLType` 
+    /// using the given formatter.
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result { 
+        write!(f, "\x1b[{}m", (*self as u32) % 100) 
+    }
 }
 
 /// Configuration for syntax highlighting.

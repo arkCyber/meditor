@@ -1,3 +1,5 @@
+//  editor.rs
+//
 #![allow(clippy::wildcard_imports)]
 
 use std::fmt::{Display, Write as _};
@@ -9,6 +11,7 @@ use crate::row::{HlState, Row};
 use crate::{ansi_escape::*, syntax::Conf as SyntaxConf, sys, terminal, Config, Error};
 
 const fn ctrl_key(key: u8) -> u8 { key & 0x1f }
+
 const EXIT: u8 = ctrl_key(b'Q');
 const DELETE_BIS: u8 = ctrl_key(b'H');
 const REFRESH_SCREEN: u8 = ctrl_key(b'L');
@@ -24,12 +27,13 @@ const REMOVE_LINE: u8 = ctrl_key(b'R');
 const BACKSPACE: u8 = 127;
 
 const HELP_MESSAGE: &str =
-    "^S save | ^Q quit | ^F find | ^G go to | ^D duplicate | ^E execute | ^C copy | ^X cut | ^V paste";
+    " ^S save | ^Q quit | ^F find | ^G go to | ^D duplicate | ^E execute | ^C copy | ^X cut | ^V paste";
 
 /// `set_status!` sets a formatted status message for the editor.
 /// Example usage: `set_status!(editor, "{} written to {}", file_size, file_name)`
 macro_rules! set_status {
-    ($editor:expr, $($arg:expr),*) => ($editor.status_msg = Some(StatusMessage::new(format!($($arg),*))))
+    ($editor:expr, $($arg:expr),*) => 
+        ($editor.status_msg = Some(StatusMessage::new(format!($($arg),*))))
 }
 
 /// Enum of input keys
@@ -126,35 +130,42 @@ pub struct Editor {
 
 /// Describes a status message, shown at the bottom at the screen.
 struct StatusMessage {
-    /// The message to display.
-    msg: String,
-    /// The `Instant` the status message was first displayed.
-    time: Instant,
+    
+    msg: String,        // The message to display.
+    
+    time: Instant,      // The `Instant` the status message was first displayed.
 }
 
 impl StatusMessage {
     /// Create a new status message and set time to the current date/time.
-    fn new(msg: String) -> Self { Self { msg, time: Instant::now() } }
+    fn new(msg: String) -> Self { 
+        Self { 
+            msg, 
+            time: Instant::now() 
+        } 
+    }
 }
 
 /// Pretty-format a size in bytes.
 fn format_size(n: u64) -> String {
     if n < 1024 {
-        return format!("{n}B");
+        return format!("{n} Bytes");
     }
     // i is the largest value such that 1024 ^ i < n
     // To find i we compute the smallest b such that n <= 1024 ^ b and subtract 1 from it
     let i = (64 - n.leading_zeros() + 9) / 10 - 1;
+
     // Compute the size with two decimal places (rounded down) as the last two digits of q
     // This avoid float formatting reducing the binary size
     let q = 100 * n / (1024 << ((i - 1) * 10));
-    format!("{}.{:02}{}B", q / 100, q % 100, b" kMGTPEZ"[i as usize] as char)
+    format!("{}.{:02}{} Bytes", q / 100, q % 100, b" kMGTPEZ"[i as usize] as char)
 }
 
 /// `slice_find` returns the index of `needle` in slice `s` if `needle` is a subslice of `s`,
 /// otherwise returns `None`.
 fn slice_find<T: PartialEq>(s: &[T], needle: &[T]) -> Option<usize> {
-    (0..(s.len() + 1).saturating_sub(needle.len())).find(|&i| s[i..].starts_with(needle))
+    (0..(s.len() + 1).saturating_sub(needle.len()))
+                     .find(|&i| s[i..].starts_with(needle))
 }
 
 impl Editor {
@@ -164,7 +175,8 @@ impl Editor {
     ///
     /// Will return `Err` if an error occurs when enabling termios raw mode, creating the signal hook
     /// or when obtaining the terminal window size.
-    #[allow(clippy::field_reassign_with_default)] // False positive : https://github.com/rust-lang/rust-clippy/issues/6312
+    #[allow(clippy::field_reassign_with_default)] 
+    // False positive : https://github.com/rust-lang/rust-clippy/issues/6312
     pub fn new(config: Config) -> Result<Self, Error> {
         sys::register_winsize_change_signal_handler()?;
         let mut editor = Self::default();
@@ -486,6 +498,7 @@ impl Editor {
                 written += 1;
             }
         }
+
         file.sync_all()?;
         Ok(written)
     }
@@ -530,7 +543,8 @@ impl Editor {
     /// all the rows are empty, `is_empty` returns `false`, since the text contains new lines.
     fn is_empty(&self) -> bool { self.rows.len() <= 1 && self.n_bytes == 0 }
 
-    /// Draw rows of text and empty rows on the terminal, by adding characters to the buffer.
+    /// Draw rows of text and empty rows on the terminal, 
+    /// by adding characters to the buffer.
     fn draw_rows(&self, buffer: &mut String) -> Result<(), Error> {
         let row_it = self.rows.iter().map(Some).chain(repeat(None)).enumerate();
         for (i, row) in row_it.skip(self.cursor.roff).take(self.screen_rows) {
@@ -542,35 +556,41 @@ impl Editor {
             } else {
                 // Draw an empty row
                 self.draw_left_padding(buffer, '~')?;
+
                 if self.is_empty() && i == self.screen_rows / 3 {
-                    let welcome_message = concat!("Kibi ", env!("KIBI_VERSION"));
+                    let welcome_message = r"Welcome to Web3 world with meditor! ";
                     write!(buffer, "{:^1$.1$}", welcome_message, self.screen_cols)?;
+                    write!(buffer, "{:^1$.1$}", " ", self.screen_cols + 1)?;
+                    write!(buffer, "{:^1$.1$}", "arksong2018@gmail.com", self.screen_cols + 1)?;
+                    write!(buffer, "{:^1$.1$}", "2023.11.27", self.screen_cols + 1)?;
                 }
             }
             buffer.push_str("\r\n");
         }
         Ok(())
     }
-
+    //
     /// Draw the status bar on the terminal, by adding characters to the buffer.
+    //
     fn draw_status_bar(&self, buffer: &mut String) -> Result<(), Error> {
         // Left part of the status bar
         let modified = if self.dirty { " (modified)" } else { "" };
         let mut left =
-            format!("{:.30}{modified}", self.file_name.as_deref().unwrap_or("[No Name]"));
+            format!("{:.30}{modified}", self.file_name.as_deref().unwrap_or(" [No Name]"));
         left.truncate(self.window_width);
 
         // Right part of the status bar
         let size = format_size(self.n_bytes + self.rows.len().saturating_sub(1) as u64);
         let right =
-            format!("{} | {size} | {}:{}", self.syntax.name, self.cursor.y + 1, self.rx() + 1);
+            format!("{} | {size } | Row:{} Col:{}   ", self.syntax.name, self.cursor.y + 1, self.rx() + 1);
 
-        // Draw
+        // Draw bottom message bar
         let rw = self.window_width.saturating_sub(left.len());
         write!(buffer, "{REVERSE_VIDEO}{left}{right:>rw$.rw$}{RESET_FMT}\r\n")?;
+
         Ok(())
     }
-
+    ///
     /// Draw the message bar on the terminal, by adding characters to the buffer.
     fn draw_message_bar(&self, buffer: &mut String) {
         buffer.push_str(CLEAR_LINE_RIGHT_OF_CURSOR);
@@ -628,6 +648,7 @@ impl Editor {
                 self.move_cursor(&AKey::Right, false);
                 self.delete_char();
             }
+
             Key::Escape | Key::Char(REFRESH_SCREEN) => (),
             Key::Char(EXIT) => {
                 quit_times = self.quit_times - 1;
@@ -637,6 +658,7 @@ impl Editor {
                 let times = if quit_times > 1 { "times" } else { "time" };
                 set_status!(self, "Press Ctrl+Q {} more {} to quit.", quit_times, times);
             }
+
             Key::Char(SAVE) => match self.file_name.take() {
                 // TODO: Can we avoid using take() then reassigning the value to file_name?
                 Some(file_name) => {
@@ -646,16 +668,19 @@ impl Editor {
                 None => prompt_mode = Some(PromptMode::Save(String::new())),
             },
             Key::Char(FIND) =>
-                prompt_mode = Some(PromptMode::Find(String::new(), self.cursor.clone(), None)),
-            Key::Char(GOTO) => prompt_mode = Some(PromptMode::GoTo(String::new())),
+                            prompt_mode = Some(PromptMode::Find(String::new(), self.cursor.clone(), None)),
+            Key::Char(GOTO) => 
+                            prompt_mode = Some(PromptMode::GoTo(String::new())),
             Key::Char(DUPLICATE) => self.duplicate_current_row(),
             Key::Char(CUT) => {
                 self.copy_current_row();
                 self.delete_current_row();
             }
+
             Key::Char(COPY) => self.copy_current_row(),
             Key::Char(PASTE) => self.paste_current_row(),
-            Key::Char(EXECUTE) => prompt_mode = Some(PromptMode::Execute(String::new())),
+            Key::Char(EXECUTE) => 
+                            prompt_mode = Some(PromptMode::Execute(String::new())),
             Key::Char(c) => self.insert_byte(*c),
         }
         self.quit_times = quit_times;
@@ -699,11 +724,13 @@ impl Editor {
             self.rows.push(Row::new(Vec::new()));
             self.file_name = None;
         }
+
         loop {
             if let Some(mode) = self.prompt_mode.as_ref() {
                 set_status!(self, "{}", mode.status_msg());
             }
             self.refresh_screen()?;
+            
             let key = self.loop_until_keypress()?;
             // TODO: Can we avoid using take()?
             self.prompt_mode = match self.prompt_mode.take() {
@@ -759,6 +786,7 @@ impl PromptMode {
     /// Process a keypress event for the selected `PromptMode`.
     fn process_keypress(self, ed: &mut Editor, key: &Key) -> Result<Option<Self>, Error> {
         ed.status_msg = None;
+
         match self {
             Self::Save(b) => match process_prompt_keypress(b, key) {
                 PromptState::Active(b) => return Ok(Some(Self::Save(b))),
